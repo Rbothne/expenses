@@ -27,9 +27,9 @@ export interface ParsedRow {
   cardMember?: string;
 }
 
+/** Stored transaction. Merchant and category are derived at read time from rules. */
 export interface Txn extends ParsedRow {
   id: string;
-  merchant: string;
   importId: string;
 }
 

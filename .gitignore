@@ -19,3 +19,4 @@ rules*.json
 expenses-backup*.json
 # Synthetic test fixtures are the one allowed exception.
 !tests/fixtures/*.csv
+!tests/fixtures/*.CSV
