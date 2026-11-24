@@ -1,3 +1,4 @@
+import { LOAN, MORTGAGE } from "./classify";
 import { normalizeMerchant } from "./merchant";
 import type { Rules, Txn } from "./types";
 
@@ -18,6 +19,7 @@ export const CATEGORIES = [
   "Education",
   "Gifts & Donations",
   "Fees & Interest",
+  "Loans",
   "Other",
 ] as const;
 
@@ -102,8 +104,9 @@ const MERCHANT_CATEGORY: Record<string, string> = {
   Lyft: "Travel",
 };
 
-/** Rent and mortgage, usually paid from checking with nothing but a payee name. Not "RENT-A-CAR". */
-const HOUSING = /\bRENT\b(?!-A-)|\bAPARTMENTS?\b|\bAPTS\b|PROPERTY (MGMT|MANAGEMENT)|\bMORTGAGE\b|\bMTG PMT\b|\bHOA\b|\bLANDLORD\b/i;
+/** Rent, usually paid from checking with nothing but a payee name. Not rent-a-car, Rent-A-Center, Rent the Runway, Apartments.com. */
+const RENT = /\bRENT\b(?![- ]?A[- ]?(CAR|CENTER)| THE RUNWAY)|\bAPARTMENTS?\b(?!\.COM)|\bAPTS\b|PROPERTY (MGMT|MANAGEMENT)|\bHOA\b|\bLANDLORD\b/i;
+const isHousing = (d: string) => RENT.test(d) || MORTGAGE.test(d);
 
 const safeTest = (pattern: string, s: string) => {
   try {
@@ -124,8 +127,10 @@ export function mapIssuerCategory(account: string, issuerCategory: string | unde
 }
 
 /**
- * Resolution order: override → merchant rule → description rule → fee/interest → built-in merchant → rent/mortgage →
- * (refunds) the merchant's usual purchase category → issuer map → Other.
+ * Resolution order: override → merchant rule → description rule → fee/interest → built-in merchant →
+ * (refunds) the merchant's usual purchase category → issuer map → rent/mortgage → other loans → Other.
+ * Housing and loans come after the bank's own category, so a card's "Travel" label beats a stray "RENT" in a name;
+ * checking accounts carry no category, which is where rent and loans are actually paid.
  */
 export function resolveCategory(t: Txn, rules: Rules, merchant = normalizeMerchant(t.rawDescription, rules), refundHint?: string): string {
   const o = rules.overrides[t.id];
@@ -137,7 +142,10 @@ export function resolveCategory(t: Txn, rules: Rules, merchant = normalizeMercha
   if (t.kind === "fee" || t.kind === "interest") return "Fees & Interest";
   const b = MERCHANT_CATEGORY[merchant];
   if (b) return b;
-  if (HOUSING.test(t.rawDescription)) return "Housing";
   if (t.kind === "refund" && refundHint) return refundHint;
-  return mapIssuerCategory(t.account, t.issuerCategory, rules) ?? "Other";
+  const issuer = mapIssuerCategory(t.account, t.issuerCategory, rules);
+  if (issuer) return issuer;
+  if (isHousing(t.rawDescription)) return "Housing";
+  if (LOAN.test(t.rawDescription)) return "Loans";
+  return "Other";
 }

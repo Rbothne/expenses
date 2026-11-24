@@ -27,7 +27,7 @@ describe("housing", () => {
     const old = { ...defaultRules(), categories: ["Groceries", "Other"] } as Partial<ReturnType<typeof defaultRules>>;
     delete (old as Record<string, unknown>).incomePatterns;
     const up = withDefaults(old);
-    expect(up.categories).toEqual(["Housing", "Groceries", "Other"]);
+    expect(up.categories).toEqual(["Housing", "Groceries", "Loans", "Other"]);
     const removed = withDefaults({ ...up, categories: ["Groceries", "Other"] });
     expect(removed.categories).toEqual(["Groceries", "Other"]);
   });

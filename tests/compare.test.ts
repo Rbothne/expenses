@@ -62,9 +62,9 @@ describe("coverageGaps", () => {
       ],
       rules,
     );
-    const g = coverageGaps(all, { from: "2025-01-01", to: "2025-11-30" }, "bank");
-    expect(g).toEqual([{ account: "amex", first: "2026-02-15", last: "2026-11-02" }]);
-    expect(coverageGaps(all, { from: "2026-03-01", to: "2026-10-31" }, "bank")).toEqual([]);
+    const g = coverageGaps(all, { from: "2025-01-01", to: "2025-11-30" });
+    expect(g).toEqual([{ account: "amex", first: "2026-02-15", last: "2026-11-02", holes: [] }]);
+    expect(coverageGaps(all, { from: "2026-03-01", to: "2026-10-31" })).toEqual([]);
   });
 });
 

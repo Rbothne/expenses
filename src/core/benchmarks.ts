@@ -60,8 +60,11 @@ const baseCpi = (period: string) => {
  * Multiplier taking a survey figure (base period "2025" or "2023-2024") into the dollars of the spending window:
  * the month-weighted CPI of the window over the base. Years without an annual average use the latest month.
  */
-export function cpiFactor(r: { from: string; to: string }, basePeriod: string): number {
+export function cpiFactor(r: { from: string; to: string }, basePeriod: string): number | null {
+  const years = Object.keys(CPI).sort();
   const months = bucketRange(r.from, r.to, "month");
+  // Only years after the newest annual average may borrow the latest month; earlier unknown years can't be adjusted.
+  if (months.some((m) => m.slice(0, 4) < years[0])) return null;
   const v = months.reduce((a, m) => a + (CPI[m.slice(0, 4)] ?? data.cpi.latestMonth.value), 0) / months.length;
   return v / baseCpi(basePeriod);
 }
@@ -132,10 +135,10 @@ export function compareToGroup(spend: EnrichedTxn[], r: { from: string; to: stri
       lines = h.lines;
       groupNote = h.note;
     }
-    const f = cpiFactor(r, basePeriodOf(g));
-    const context = lines.filter((l) => g.values[l] != null).map((l) => ({ label: lineLabel(l), value: cents(g.values[l] * f) }));
+    const f = cpiFactor(r, basePeriodOf(g)) ?? NaN;
+    const context = Number.isFinite(f) ? lines.filter((l) => g.values[l] != null).map((l) => ({ label: lineLabel(l), value: cents(g.values[l] * f) })) : [];
     const missing = m.comparable && lines.some((l) => g.values[l] == null);
-    const them = m.comparable && !missing ? cents(lines.reduce((a, l) => a + g.values[l], 0) * f) : null;
+    const them = m.comparable && !missing && Number.isFinite(f) ? cents(lines.reduce((a, l) => a + g.values[l], 0) * f) : null;
     return {
       category,
       you,

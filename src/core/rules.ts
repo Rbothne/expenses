@@ -26,6 +26,9 @@ export const DEFAULT_PAYMENT_PATTERNS = [
   "\\bPYMT\\b",
 ];
 
+/** Deposits mentioning these are never pay, even when they also say "PAYROLL" or "DIRECT DEPOSIT". */
+export const NOT_INCOME = /REFUND|REIMB|REVERSAL|RETURN/i;
+
 /** How paychecks show up in checking. Deliberately not bare "DEPOSIT" or "ACH", which also hit transfers and refunds. */
 export const DEFAULT_INCOME_PATTERNS = ["PAYROLL", "\\bPAYRL\\b", "\\bDIR(ECT)? ?DEP", "DIRECT DEPOSIT", "\\bSALARY\\b", "\\bPAYCHECK\\b"];
 
@@ -74,8 +77,16 @@ export function defaultRules(): Rules {
 export function withDefaults(r: Partial<Rules> | undefined): Rules {
   const d = defaultRules();
   const out: Rules = { ...d, ...(r ?? {}), version: 1 };
-  // Files from before Housing existed (they also lack incomePatterns) gain it once; a later removal sticks.
-  if (r && !r.incomePatterns && r.categories && !r.categories.includes("Housing")) out.categories = ["Housing", ...r.categories];
-  out.profile = { ...(r?.profile ?? {}) };
+  // Hand-edited files may hold null where a list belongs.
+  for (const k of ["categories", "incomePatterns", "needsCategories", "transferPatterns", "paymentPatterns", "aliases", "descriptionRules", "columnMappings"] as const)
+    if (!Array.isArray(out[k])) (out as unknown as Record<string, unknown>)[k] = d[k];
+  // Files from before Housing and Loans existed (they also lack incomePatterns) gain them once; a later removal sticks.
+  if (r && !Array.isArray(r.incomePatterns) && Array.isArray(r.categories)) {
+    const cats = [...r.categories];
+    if (!cats.includes("Housing")) cats.unshift("Housing");
+    if (!cats.includes("Loans")) cats.splice(cats.includes("Other") ? cats.indexOf("Other") : cats.length, 0, "Loans");
+    out.categories = cats;
+  }
+  out.profile = r?.profile && typeof r.profile === "object" ? { ...r.profile } : {};
   return out;
 }

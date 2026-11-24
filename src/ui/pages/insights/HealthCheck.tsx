@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { groupOptions, guideline, type Guideline } from "../../../core/benchmarks";
 import { healthMetrics } from "../../../core/health";
-import { rangeFor } from "../../../core/range";
+import { fullMonths } from "../../../core/range";
 import { useApp } from "../../../state";
 import { fmtDate, money0, pct } from "../../format";
 import { href } from "../../router";
@@ -55,8 +55,8 @@ const atLeast = (x: number, line: number): Verdict => (x >= line ? "meets" : x >
 export function HealthCheck() {
   const { enriched, snapshot, earliest, latest } = useApp();
   const rules = snapshot.rules;
-  const r = rangeFor("12m", latest, earliest);
-  const win = { from: r.from < earliest ? earliest.slice(0, 8) + "01" : r.from, to: r.to };
+  // The last 12 complete months, so a half-imported current month isn't averaged as a whole one.
+  const win = fullMonths(latest, earliest, 12);
   const m = useMemo(() => healthMetrics(enriched, rules, win), [enriched, rules, win.from, win.to]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!enriched.length) return null;
 
@@ -76,7 +76,7 @@ export function HealthCheck() {
     m.income.source === "typed"
       ? `${money0(inc!)}/mo (typed)`
       : m.income.source === "detected"
-        ? `${money0(inc!)}/mo (${money0(m.income.detected)} in paychecks over ${m.months} months)`
+        ? `${money0(inc!)}/mo (${money0(m.income.detected)} in paychecks over ${m.income.months} months${m.income.partial ? ` — Schwab is only imported for ${m.income.months} of these ${m.months} months` : ""})`
         : "unknown: no paychecks matched. Type it above, or adjust Paychecks on the Rules page.";
 
   // HUD counts utilities in housing cost; our Utilities & Bills also holds phone/internet, so the pair brackets the truth.
@@ -127,18 +127,26 @@ export function HealthCheck() {
           <Check
             g={needs}
             title="50/30/20 budget"
-            verdict={s.needs == null ? "unknown" : s.savings! >= save.lo && s.needs <= needs.hi && s.wants! <= wants.hi ? "meets" : s.savings! >= save.lo * 0.5 ? "close" : "misses"}
+            verdict={
+              s.needs == null
+                ? "unknown"
+                : s.savings! >= save.lo && s.needs <= needs.hi && s.wants! <= wants.hi
+                  ? "meets"
+                  : s.savings! >= save.lo * 0.9 && s.needs <= needs.hi * 1.1 && s.wants! <= wants.hi * 1.1
+                    ? "close"
+                    : "misses"
+            }
             meter={s.needs != null ? <Meter value={s.needs} mark={needs.hi} max={Math.max(1, s.needs + s.wants!)} /> : undefined}
           >
             {s.needs == null ? (
               <>Needs take-home pay to split.</>
             ) : (
               <>
-                Needs <strong>{pct(s.needs)}</strong> (≤{pct(needs.hi)}) · wants <strong>{pct(s.wants!)}</strong> (≤{pct(wants.hi)}) · left over <strong>{pct(s.savings!)}</strong> (≥{pct(save.lo)})
+                Needs <strong>{pct(s.needs)}</strong> (≤{pct(needs.hi)}) · wants <strong>{pct(s.wants!)}</strong> (≤{pct(wants.hi)}) · savings &amp; debt paydown <strong>{pct(s.savings!)}</strong> (≥{pct(save.lo)})
                 {m.savingsMonthly! < 0 && <>. You spent {money0(-m.savingsMonthly!)}/mo more than you took home.</>}
                 <br />
                 <span className="muted">
-                  Needs = {rules.needsCategories.join(", ")}. “Left over” is take-home minus everything tracked here, so it's only right if every account you spend from is imported.
+                  Needs = {rules.needsCategories.join(", ")}. Savings &amp; debt paydown = take-home minus spending, plus loan payments. It's only right if every account you spend from is imported.
                 </span>
               </>
             )}
@@ -169,7 +177,7 @@ export function HealthCheck() {
           <Check g={retire} verdict={gross ? "manual" : "unknown"}>
             {gross ? (
               <>
-                {pct(retire.lo)} of {money0(gross)} is <strong>{money0((gross * retire.lo) / 12)}/mo</strong>, employer match included. Payroll 401(k) contributions never pass through these accounts, so compare it with your pay stub.
+                {pct(retire.lo)} of {money0(gross)} is <strong>{money0((gross * retire.lo) / 12)}/mo</strong>, employer match included. Payroll 401(k) contributions don't pass through checking or cards, so compare it with your pay stub (plus any IRA deposits).
               </>
             ) : (
               <>Enter before-tax income to see the monthly amount. Payroll contributions don't appear in bank exports, so this can't be checked automatically.</>
@@ -178,14 +186,21 @@ export function HealthCheck() {
         )}
 
         {card && (
-          <Check g={card} title="Card interest" verdict={m.interestFees > 0 ? "misses" : "meets"}>
-            {m.interestFees > 0 ? (
+          <Check g={card} title="Card interest" verdict={m.cardInterest > 0 ? "misses" : "meets"}>
+            {m.cardInterest > 0 ? (
               <>
-                You paid <strong>{money0(m.interestFees)}</strong> in card interest and fees over these {m.months} months. See <a href={href(`/category/${encodeURIComponent("Fees & Interest")}`)}>Fees &amp; Interest</a>.
+                You paid <strong>{money0(m.cardInterest)}</strong> in card interest over these {m.months} months, so a balance was carried.
               </>
             ) : (
-              <>No interest or fees in this window.</>
+              <>No card interest in this window.</>
             )}
+            {m.fees > 0 && (
+              <>
+                {" "}
+                Separately, {money0(m.fees)} in fees (annual, ATM and the like).
+              </>
+            )}{" "}
+            <a href={href(`/category/${encodeURIComponent("Fees & Interest")}`)}>See Fees &amp; Interest</a>
           </Check>
         )}
       </div>

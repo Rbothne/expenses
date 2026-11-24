@@ -35,3 +35,27 @@ export function rangeFor(preset: RangePreset, anchor: string, earliest: string, 
       return { from: custom?.from || earliest, to: custom?.to || to };
   }
 }
+
+/**
+ * The last n complete months of data, for monthly averages. The newest month counts only when the data reaches its
+ * last few days; the oldest only when the data starts in its first few days. Otherwise a half-imported month would
+ * be averaged as a whole one.
+ */
+export function fullMonths(latest: string, earliest: string, n: number): { from: string; to: string } {
+  let y = +latest.slice(0, 4);
+  let m = +latest.slice(5, 7);
+  if (+latest.slice(8) < +monthEnd(y, m).slice(8) - 2) m--;
+  if (m < 1) {
+    m = 12;
+    y--;
+  }
+  const to = monthEnd(y, m);
+  let from = monthStart(y, m - (n - 1));
+  if (earliest > from) {
+    const ey = +earliest.slice(0, 4),
+      em = +earliest.slice(5, 7);
+    const startMonth = +earliest.slice(8) <= 3 ? monthStart(ey, em) : monthStart(em === 12 ? ey + 1 : ey, em === 12 ? 1 : em + 1);
+    if (startMonth > from) from = startMonth;
+  }
+  return { from, to };
+}

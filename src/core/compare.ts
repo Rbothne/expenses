@@ -1,4 +1,4 @@
-import { accountKey, type EnrichedTxn, type GroupBy } from "./aggregate";
+import type { EnrichedTxn } from "./aggregate";
 import { cents } from "./money";
 
 export type CompareMode = "yoy" | "prev";
@@ -76,7 +76,7 @@ export function deltas(cur: EnrichedTxn[], prev: EnrichedTxn[], keyOf: (t: Enric
     .map(([key, v]) => {
       const c = cents(v.cur),
         p = cents(v.prev);
-      return { key, cur: c, prev: p, delta: cents(c - p), pct: p >= MIN_PCT_BASE ? c / p - 1 : null };
+      return { key, cur: c, prev: p, delta: cents(c - p), pct: p >= MIN_PCT_BASE && c >= 0 ? c / p - 1 : null };
     })
     .sort((a, z) => Math.abs(z.delta) - Math.abs(a.delta));
 }
@@ -85,36 +85,68 @@ export interface Gap {
   account: string;
   first: string;
   last: string;
+  /** months (yyyy-mm) with nothing imported inside an otherwise regular history */
+  holes: string[];
 }
 
-/** Grace for "history starts on the 3rd of the month": quiet weeks are normal, missing months are not. */
-const GRACE_DAYS = 31;
+/** History may start or end this many days inside the range before it counts as missing (quiet weeks are normal). */
+const EDGE_GRACE_DAYS = 14;
 
-/**
- * Accounts (or cards) whose imported history doesn't span the whole range. Comparing a period where Amex is
- * missing against one where it's present reads as a spending jump that never happened. Pass all rows, not
- * just spending, so payments count as evidence the account was imported for those dates.
- */
-export function coverageGaps(all: EnrichedTxn[], r: Range, groupBy: GroupBy): Gap[] {
-  const span = new Map<string, { first: string; last: string }>();
-  for (const t of all) {
-    const k = accountKey(t, groupBy);
-    const s = span.get(k);
-    if (!s) span.set(k, { first: t.date, last: t.date });
-    else {
-      if (t.date < s.first) s.first = t.date;
-      if (t.date > s.last) s.last = t.date;
+const monthsBetween = (from: string, to: string) => {
+  const out: string[] = [];
+  let y = +from.slice(0, 4),
+    m = +from.slice(5, 7);
+  const end = to.slice(0, 7);
+  for (let k = `${y}-${String(m).padStart(2, "0")}`; k <= end; k = `${y}-${String(m).padStart(2, "0")}`) {
+    out.push(k);
+    if (++m > 12) {
+      m = 1;
+      y++;
     }
   }
-  const from = utc(r.from).getTime();
-  const to = utc(r.to).getTime();
-  const out: Gap[] = [];
-  for (const [account, s] of span) {
-    const lateStart = (utc(s.first).getTime() - from) / 86400000 > GRACE_DAYS;
-    const earlyEnd = (to - utc(s.last).getTime()) / 86400000 > GRACE_DAYS;
-    if (lateStart || earlyEnd) out.push({ account, ...s });
+  return out;
+};
+
+/** Clamp a window to the newest data, so a half-imported current month compares against the same dates a year ago. */
+export const clampToData = (r: Range, latest: string): Range => ({ from: r.from, to: r.to > latest ? latest : r.to });
+
+/**
+ * Bank accounts whose imported history doesn't cover the range: starting or ending more than two weeks inside it,
+ * or a run of 2+ empty months in an account that otherwise has activity in at least 80% of its months (a card used
+ * now and then has quiet months; a card missing an export has a hole). Judged per bank account, not per card, so a
+ * replacement card isn't a gap. Pass all rows, not just spending: payments are evidence the account was imported.
+ */
+export function coverageGaps(all: EnrichedTxn[], r: Range): Gap[] {
+  const acc = new Map<string, { first: string; last: string; months: Set<string> }>();
+  for (const t of all) {
+    const a = acc.get(t.account) ?? { first: t.date, last: t.date, months: new Set<string>() };
+    if (t.date < a.first) a.first = t.date;
+    if (t.date > a.last) a.last = t.date;
+    a.months.add(t.date.slice(0, 7));
+    acc.set(t.account, a);
   }
-  return out.sort((a, z) => a.account.localeCompare(z.account));
+  const day = (a: string, b: string) => (utc(b).getTime() - utc(a).getTime()) / 86400000;
+  const out: Gap[] = [];
+  for (const [account, a] of acc) {
+    const edges = day(r.from, a.first) > EDGE_GRACE_DAYS || day(a.last, r.to) > EDGE_GRACE_DAYS;
+    const span = monthsBetween(a.first > r.from ? a.first : r.from, a.last < r.to ? a.last : r.to);
+    const holes: string[] = [];
+    for (let i = 0; i < span.length; ) {
+      if (a.months.has(span[i])) {
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j < span.length && !a.months.has(span[j])) j++;
+      const run = span.slice(i, j);
+      const outside = span.length - run.length;
+      const active = span.filter((m) => a.months.has(m)).length;
+      if (run.length >= 2 && outside > 0 && active / outside >= 0.8) holes.push(...run);
+      i = j;
+    }
+    if (edges || holes.length) out.push({ account, first: a.first, last: a.last, holes });
+  }
+  return out.sort((x, z) => x.account.localeCompare(z.account));
 }
 
 const median = (xs: number[]) => {
@@ -146,8 +178,10 @@ export function priceChanges(cur: EnrichedTxn[], prev: EnrichedTxn[]): PriceChan
     const near = xs.filter((x) => Math.abs(x - md) <= md * 0.05).length;
     return near / xs.length >= 0.75 ? md : null;
   };
-  const a = charges(prev),
-    b = charges(cur);
+  // Files list newest-first or oldest-first; "latest charges" must mean by date.
+  const byDate = (rows: EnrichedTxn[]) => [...rows].sort((x, z) => (x.date < z.date ? -1 : x.date > z.date ? 1 : 0));
+  const a = charges(byDate(prev)),
+    b = charges(byDate(cur));
   const out: PriceChange[] = [];
   for (const [merchant, xs] of b) {
     const before = a.get(merchant) ? steady(a.get(merchant)!) : null;
@@ -203,17 +237,22 @@ export function insights(cur: EnrichedTxn[], prev: EnrichedTxn[], opts: { limit?
     if (out.filter((i) => i.type === "category").length >= limit) break;
   }
 
-  // Months each merchant was charged in the earlier period, to tell a stopped subscription from a one-off.
+  // A stopped *recurring* charge: 3+ months, charged in at least 60% of the months between its first and last
+  // charge. Three scattered coffees aren't a cancelled subscription.
   const prevMonths = new Map<string, Set<string>>();
   for (const t of prev) if (t.amount > 0) prevMonths.set(t.merchant, (prevMonths.get(t.merchant) ?? new Set()).add(t.date.slice(0, 7)));
+  const regular = (k: string) => {
+    const ms = [...(prevMonths.get(k) ?? [])].sort();
+    return ms.length >= 3 && ms.length / monthsBetween(ms[0] + "-01", ms[ms.length - 1] + "-01").length >= 0.6;
+  };
 
   const merchants = deltas(cur, prev, (t) => t.merchant);
   const newOnes: Insight[] = [];
   const gone: Insight[] = [];
   const movers: Insight[] = [];
   for (const m of merchants) {
-    if (m.prev <= 0 && m.cur >= floor) newOnes.push({ type: "new", key: m.key, cur: m.cur });
-    else if (m.cur <= 0 && m.prev > 0 && (prevMonths.get(m.key)?.size ?? 0) >= 3) gone.push({ type: "gone", key: m.key, prev: m.prev, months: prevMonths.get(m.key)!.size });
+    if (m.prev === 0 && m.cur >= floor) newOnes.push({ type: "new", key: m.key, cur: m.cur });
+    else if (m.cur <= 0 && m.prev > 0 && regular(m.key)) gone.push({ type: "gone", key: m.key, prev: m.prev, months: prevMonths.get(m.key)!.size });
     else if (m.prev > 0 && m.cur > 0 && matters(m, floor) && !drivers.has(m.key)) movers.push({ type: "merchant", ...m });
   }
   out.push(...movers.slice(0, limit), ...newOnes.slice(0, limit), ...gone.sort((a, z) => (z as { prev: number }).prev - (a as { prev: number }).prev).slice(0, limit));

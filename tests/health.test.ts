@@ -45,7 +45,8 @@ describe("healthMetrics", () => {
     expect(m.shares).toMatchObject({ needs: 0.4, wants: 0.064, savings: 0.536, housingOfTakeHome: 0.3 });
   });
   it("interest and fees paid in the window", () => {
-    expect(m.interestFees).toBe(40);
+    expect(m.cardInterest).toBe(40);
+    expect(m.fees).toBe(0);
   });
   it("housing against gross income only when gross is known", () => {
     expect(m.shares.housingOfGross).toBeNull();

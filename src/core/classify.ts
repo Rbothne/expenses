@@ -16,14 +16,16 @@ export interface RawRow {
 }
 
 const INTEREST = /\bINTEREST (CHARGE|CHARGED)\b|PURCHASE INTEREST|INTEREST CHARGE ON/i;
-const FEE_DESC = /\b(LATE|ANNUAL|MEMBERSHIP|FOREIGN TRANSACTION|RETURNED PAYMENT|OVER ?LIMIT|CASH ADVANCE) FEE\b/i;
+const FEE_DESC = /\b(LATE|ANNUAL|MEMBERSHIP|FOREIGN TRANSACTION|RETURNED PAYMENT|OVER ?LIMIT|CASH ADVANCE|ATM|OVERDRAFT|NSF|WIRE|MONTHLY SERVICE|MAINTENANCE) FEE\b/i;
 const FEE_CAT = /^fees?\b|fee\/interest|^fees & adjustments/i;
 const INTEREST_CAT = /^interest\b|interest charge/i;
 const REWARD = /CASH ?BACK|\bREWARDS?\b|REDEMPTION|\bAWARD/i;
 const REWARD_CAT = /award|rebate|reward/i;
 const PAYMENT_REVERSAL = /PAYMENT REVERSAL|RETURNED PAYMENT|PAYMENT RETURNED|REVERSE PAYMENT/i;
-/** Loans paid to a card issuer ("CHASE MORTGAGE") are spending, even though the issuer name looks like a payoff. */
-const LOAN = /\bMORTGAGE\b|\bMTG\b|\bLOAN\b|\bAUTO LN\b|\bHOME ?LN\b/i;
+/** Mortgage payments as banks write them. Not bare "MTG" (Magic: The Gathering) or "LOANDEPOT" ads. */
+export const MORTGAGE = /\bMORTGAGE\b|\bMTG (PMT|PYMT|PAYMENT)\b|\bHOME MTG\b|\bHOME ?LN\b/i;
+/** Other loan payments (auto, student, personal). */
+export const LOAN = /\bLOANS?\b|\bAUTO LN\b|\bSTUDENT LN\b/i;
 const TRANSFER_DESC = /FUNDS TRANSFER|\bTRANSFER (TO|FROM)\b|\bXFER\b/i;
 
 const anyMatch = (patterns: string[], s: string) =>
@@ -44,8 +46,11 @@ export function classifyKind(r: RawRow, accountType: AccountType, rules: Pick<Ru
   if (accountType === "bank") {
     if (r.amount < 0) return "deposit";
     if (t === "intadjust" || INTEREST.test(d)) return "fee";
-    if (LOAN.test(d)) return "purchase";
-    if (t === "transfer" || TRANSFER_DESC.test(d) || anyMatch(rules.transferPatterns, d)) return "transfer";
+    // Moving money between your own accounts (even into a loan account) isn't spending.
+    if (t === "transfer" || TRANSFER_DESC.test(d)) return "transfer";
+    // A loan paid to a card issuer ("CHASE MORTGAGE") is spending, though the issuer name looks like a card payoff.
+    if (MORTGAGE.test(d) || LOAN.test(d)) return "purchase";
+    if (anyMatch(rules.transferPatterns, d)) return "transfer";
     if (FEE_DESC.test(d) || /\bfee\b/i.test(t)) return "fee";
     return "purchase";
   }

@@ -1,9 +1,9 @@
 import { useMemo } from "react";
-import { accountKey, applyFilters } from "../../core/aggregate";
-import { comparisonRange, coverageGaps, deltas, insights, materiality, yearly, type CompareMode, type Delta, type Insight } from "../../core/compare";
+import { applyFilters } from "../../core/aggregate";
+import { clampToData, comparisonRange, coverageGaps, deltas, insights, materiality, yearly, type CompareMode, type Delta, type Insight } from "../../core/compare";
 import { useApp } from "../../state";
 import { FilterBar, useFiltered, useFilters } from "../Filters";
-import { accountLabel, fmtDate, money0, money } from "../format";
+import { bankLabel, fmtDate, monthLabel, money0, money } from "../format";
 import { href, seg, setParams, type Route } from "../router";
 import { Benchmarks } from "./insights/Benchmarks";
 import { HealthCheck } from "./insights/HealthCheck";
@@ -81,7 +81,9 @@ export function Insights({ route }: { route: Route }) {
   const f = useFilters(route, "12m");
   const mode: CompareMode = route.params.get("vs") === "prev" ? "prev" : "yoy";
   const cur = useFiltered(f);
-  const before = comparisonRange(f, mode);
+  // End at the newest data: a half-imported month then compares against the same dates a year earlier.
+  const now = clampToData(f, latest);
+  const before = comparisonRange(now, mode);
   const prev = useMemo(() => applyFilters(enriched, { ...f, ...before }, groupBy), [enriched, f, before.from, before.to, groupBy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const list = useMemo(() => insights(cur, prev), [cur, prev]);
@@ -90,9 +92,11 @@ export function Insights({ route }: { route: Route }) {
   const maxCat = Math.max(0, ...cats.map((c) => Math.abs(c.delta)));
 
   const gaps = useMemo(() => {
-    const scope = f.accounts.length ? enriched.filter((t) => f.accounts.includes(accountKey(t, groupBy)) || f.accounts.includes(t.account)) : enriched;
-    return coverageGaps(scope, { from: before.from, to: f.to }, groupBy);
-  }, [enriched, f.accounts, groupBy, before.from, f.to]);
+    // Coverage is judged per bank account even in card mode, so a replacement card isn't "missing data".
+    const banks = new Set(f.accounts.map((a) => a.split(":")[0]));
+    const scope = banks.size ? enriched.filter((t) => banks.has(t.account)) : enriched;
+    return coverageGaps(scope, { from: before.from, to: now.to });
+  }, [enriched, f.accounts, before.from, now.to]);
   const noEarlier = before.to < earliest;
 
   const allSpend = useMemo(() => applyFilters(enriched, { accounts: f.accounts, categories: f.categories }, groupBy), [enriched, f.accounts, f.categories, groupBy]);
@@ -127,7 +131,7 @@ export function Insights({ route }: { route: Route }) {
         <div className="card-head">
           <h2>What changed</h2>
           <span className="muted">
-            {span(f)} vs {span(before)}
+            {span(now)} vs {span(before)}
           </span>
         </div>
         {noEarlier ? (
@@ -141,8 +145,11 @@ export function Insights({ route }: { route: Route }) {
             </p>
             {gaps.length > 0 && (
               <div className="callout" role="note">
-                <strong>Partly missing data.</strong> {gaps.map((g) => `${accountLabel(g.account, snapshot.rules)} (${fmtDate(g.first)} – ${fmtDate(g.last)})`).join(", ")}{" "}
-                {gaps.length === 1 ? "doesn't" : "don't"} cover both periods, so some of the change is imports, not spending. Import the missing months to fix it.
+                <strong>Partly missing data.</strong>{" "}
+                {gaps
+                  .map((g) => `${bankLabel(g.account, snapshot.rules)} (imported ${fmtDate(g.first)} – ${fmtDate(g.last)}${g.holes.length ? `, nothing in ${g.holes.map(monthLabel).join(", ")}` : ""})`)
+                  .join("; ")}
+                . Some of the change is missing imports, not spending; import those months to fix it.
               </div>
             )}
             {sentences.length ? <ul className="insights">{sentences.map((i) => <Sentence key={i.type + i.key} i={i} route={route} />)}</ul> : <p className="muted">Nothing moved by {money0(floor)} or more.</p>}

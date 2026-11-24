@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { CE_RELEASE, CE_YEAR, COUNTRIES, COUNTRY_META, compareToGroup, countryShares, CPI_LATEST, defaultGroupId, type BenchRow } from "../../../core/benchmarks";
-import { rangeFor } from "../../../core/range";
+import { fullMonths } from "../../../core/range";
 import { useApp } from "../../../state";
 import { fmtDate, money0, pct } from "../../format";
 import { href, seg } from "../../router";
@@ -21,8 +21,7 @@ function Pair({ you, them, max }: { you: number; them: number; max: number }) {
 export function Benchmarks() {
   const { enriched, snapshot, earliest, latest } = useApp();
   const p = snapshot.rules.profile;
-  const r = rangeFor("12m", latest, earliest);
-  const win = { from: r.from < earliest ? earliest.slice(0, 8) + "01" : r.from, to: r.to };
+  const win = fullMonths(latest, earliest, 12);
   const spend = useMemo(() => enriched.filter((t) => t.isSpend), [enriched]);
   const res = useMemo(() => compareToGroup(spend, win, defaultGroupId(p), p.tenure ?? "rent"), [spend, win.from, win.to, p.benchmarkGroup, p.householdSize, p.tenure]); // eslint-disable-line react-hooks/exhaustive-deps
   const [country, setCountry] = useState("USA");
@@ -45,7 +44,7 @@ export function Benchmarks() {
     <>
       <section className="card">
         <div className="card-head">
-          <h2>Compared with typical households</h2>
+          <h2>Compared with the average household</h2>
           <span className="muted">
             Per year, {fmtDate(win.from)} – {fmtDate(win.to)}
             {res.annualized && ` (${res.months} months, scaled to a year)`}
@@ -64,11 +63,11 @@ export function Benchmarks() {
               <tr>
                 <th>Category</th>
                 <th className="num">You</th>
-                <th className="num">Typical</th>
+                <th className="num">Average</th>
                 <th className="num">Difference</th>
                 <th className="hide-sm" style={{ width: "26%" }}>
                   <span className="legend-inline">
-                    <span className="sw you" /> you <span className="sw them" /> typical
+                    <span className="sw you" /> you <span className="sw them" /> average
                   </span>
                 </th>
               </tr>
@@ -98,9 +97,9 @@ export function Benchmarks() {
           </table>
         </div>
         <p className="note">
-          Only categories that line up with a survey line are compared. Hover a row for what's in it. Survey figures are averages over all households in the group, including ones that spent nothing on that line.
+          Only categories that line up with a survey line are compared. Hover a row for what's in it. Survey figures are averages (means) over all households in the group, including ones that spent nothing on that line, so a big spender or two pulls them up; they aren't what a “typical” household spends.{!g.period && " The 2025 survey couldn't collect data in October and November 2025 (federal funding lapse); BLS reweighted to cover the gap."}
           {missing.length > 0 && <> Not published for this area: {missing.map((x) => x.category).join(", ")}.</>}
-          {untracked.length > 0 && <> Nothing tracked for {untracked.map((x) => `${x.category} (typical ${money0(x.them!)})`).join(", ")}, so they're left out; if you pay for these some other way, that's why.</>}
+          {untracked.length > 0 && <> Nothing tracked for {untracked.map((x) => `${x.category} (average ${money0(x.them!)})`).join(", ")}, so they're left out; if you pay for these some other way, that's why.</>}
         </p>
         {context.length > 0 && (
           <details>

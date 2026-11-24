@@ -9,8 +9,12 @@ export interface HealthMetrics {
   needsMonthly: number;
   wantsMonthly: number;
   housingMonthly: number;
-  /** Interest and fees paid over the window (not per month): any interest means a balance was carried. */
-  interestFees: number;
+  /** Loan payments (category Loans): debt paydown, which 50/30/20 counts with savings, not wants. */
+  loansMonthly: number;
+  /** Card interest over the window (not per month): any means a balance was carried. */
+  cardInterest: number;
+  /** Fees over the window (annual, ATM, late...): shown, but not a pay-in-full failure. */
+  fees: number;
   income: MonthlyIncome;
   /** take-home minus spending; null without income. Overstated if some spending accounts aren't imported. */
   savingsMonthly: number | null;
@@ -35,20 +39,25 @@ export function healthMetrics(all: EnrichedTxn[], rules: Rules, r: { from: strin
     need = 0,
     housing = 0,
     util = 0,
-    interestFees = 0;
+    loans = 0,
+    interest = 0,
+    fees = 0;
   for (const t of all) {
     if (!t.isSpend || t.date < r.from || t.date > r.to) continue;
     spend += t.amount;
     if (needs.has(t.category)) need += t.amount;
     if (t.category === "Housing") housing += t.amount;
     if (t.category === "Utilities & Bills") util += t.amount;
-    if (t.kind === "interest" || t.kind === "fee") interestFees += t.amount;
+    if (t.category === "Loans") loans += t.amount;
+    if (t.kind === "interest") interest += t.amount;
+    if (t.kind === "fee") fees += t.amount;
   }
   const income = monthlyIncome(all, rules, r);
   const pm = (x: number) => cents(x / months);
   const spendMonthly = pm(spend);
   const needsMonthly = pm(need);
   const housingMonthly = pm(housing);
+  const loansMonthly = pm(loans);
   const inc = income.monthly;
   const share = (x: number) => (inc ? x / inc : null);
   const savingsMonthly = inc == null ? null : cents(inc - spendMonthly);
@@ -58,15 +67,18 @@ export function healthMetrics(all: EnrichedTxn[], rules: Rules, r: { from: strin
     months,
     spendMonthly,
     needsMonthly,
-    wantsMonthly: cents(spendMonthly - needsMonthly),
+    wantsMonthly: cents(spendMonthly - needsMonthly - loansMonthly),
     housingMonthly,
-    interestFees: cents(interestFees),
+    loansMonthly,
+    cardInterest: cents(interest),
+    fees: cents(fees),
     income,
     savingsMonthly,
     shares: {
       needs: share(needsMonthly),
-      wants: share(spendMonthly - needsMonthly),
-      savings: savingsMonthly == null ? null : share(savingsMonthly),
+      wants: share(spendMonthly - needsMonthly - loansMonthly),
+      // 50/30/20's third bucket is "savings and debt repayment": what's left plus loan payments.
+      savings: savingsMonthly == null ? null : share(savingsMonthly + loansMonthly),
       housingOfTakeHome: share(housingMonthly),
       housingOfGross: gross && gross > 0 ? housingMonthly / (gross / 12) : null,
       housingUtilOfGross: gross && gross > 0 ? (housingMonthly + pm(util)) / (gross / 12) : null,
