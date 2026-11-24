@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.superpowers/
+.vite/
+*.log
+
+# Financial data must never be committed.
+data/
+*.csv
+*.CSV
+*.qfx
+*.QFX
+*.ofx
+*.OFX
+*.pdf
+*.PDF
+ledger*.json
+rules*.json
+expenses-backup*.json
+# Synthetic test fixtures are the one allowed exception.
+!tests/fixtures/*.csv
