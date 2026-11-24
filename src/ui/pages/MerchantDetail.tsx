@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { accountKey, kpis, seriesBy } from "../../core/aggregate";
+import { applyRename } from "../../core/rules";
 import { useApp } from "../../state";
 import { CategorySelect } from "../CategorySelect";
 import { baseOption, Chart, useTokens } from "../Chart";
@@ -60,17 +61,7 @@ export function MerchantDetail({ route }: { route: Route }) {
   const doRename = async () => {
     const to = rename.trim();
     if (!to || to === name) return;
-    await updateRules((r) => {
-      const renames = { ...r.renames };
-      // Re-point anything already renamed to this name, and the base name itself.
-      for (const [k2, v] of Object.entries(renames)) if (v === name) renames[k2] = to;
-      const base = Object.entries(r.renames).find(([, v]) => v === name)?.[0] ?? name;
-      renames[base] = to;
-      const mc = { ...r.merchantCategories };
-      if (mc[name] && !mc[to]) mc[to] = mc[name];
-      delete mc[name];
-      return { ...r, renames, merchantCategories: mc };
-    });
+    await updateRules((r) => applyRename(r, name, to));
     setRename("");
     go(`/merchant/${seg(to)}`, back);
   };

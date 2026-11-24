@@ -24,12 +24,28 @@ export interface Filters {
 }
 
 export function enrich(txns: Txn[], rules: Rules): EnrichedTxn[] {
-  return txns.map((stored) => {
+  const out: EnrichedTxn[] = txns.map((stored) => {
     // Kinds are re-derived so edits to payoff/payment patterns apply to past imports too.
-    const t = { ...stored, kind: classifyKind(stored, accountTypeOf(stored.account), rules) };
+    const t = { ...stored, kind: classifyKind(stored, accountTypeOf(stored.account, rules), rules) };
     const merchant = normalizeMerchant(t.rawDescription, rules);
     return { ...t, merchant, category: resolveCategory(t, rules, merchant), isSpend: SPEND_KINDS.has(t.kind) };
   });
+  // Refunds often carry a "credits" label from the bank; net them against what the merchant was bought as.
+  const usual = new Map<string, Map<string, number>>();
+  for (const t of out) {
+    if (t.kind !== "purchase") continue;
+    const m = usual.get(t.merchant) ?? new Map<string, number>();
+    m.set(t.category, (m.get(t.category) ?? 0) + t.amount);
+    usual.set(t.merchant, m);
+  }
+  for (const t of out) {
+    if (t.kind !== "refund") continue;
+    const m = usual.get(t.merchant);
+    if (!m) continue;
+    const hint = [...m.entries()].sort((a, z) => z[1] - a[1])[0][0];
+    t.category = resolveCategory(t, rules, t.merchant, hint);
+  }
+  return out;
 }
 
 export const accountKey = (t: Pick<Txn, "account" | "cardKey">, groupBy: GroupBy) => (groupBy === "card" ? `${t.account}:${t.cardKey}` : t.account);

@@ -12,7 +12,8 @@ export const BUILTIN_FORMATS: { id: Exclude<FormatId, `generic:${string}`>; labe
   { id: "schwab", label: "Schwab bank", account: "schwab", type: "bank" },
 ];
 
-export const accountTypeOf = (account: AccountId): AccountType => BUILTIN_FORMATS.find((f) => f.account === account)?.type ?? "card";
+export const accountTypeOf = (account: AccountId, rules?: Pick<Rules, "columnMappings">): AccountType =>
+  BUILTIN_FORMATS.find((f) => f.account === account)?.type ?? rules?.columnMappings.find((m) => m.account === account)?.accountType ?? "card";
 
 export const headerSignature = (header: string[]) => header.map(normHeader).join("|");
 
@@ -154,7 +155,7 @@ export function parseFile(fileName: string, text: string, rules: Rules, opts: Pa
   } else if (format && mapping) {
     mapper = genericMapper(mapping);
     account = mapping.account;
-    accountType = "card";
+    accountType = mapping.accountType ?? "card";
   }
   if (!mapper || !format) {
     return { format: null, account: "", header, rows: [], skipped: 0, warnings: ["Unrecognized file format"], cardDetected: false };
@@ -190,6 +191,7 @@ export function parseFile(fileName: string, text: string, rules: Rules, opts: Pa
     out.push({
       account,
       cardKey,
+      cardAssumed: !(raw.cardKey && !opts.cardKey),
       date: raw.date,
       postDate: raw.postDate,
       amount: raw.amount,

@@ -5,7 +5,7 @@ import { chooseBrowserStorage, emptyLedger, folderApiAvailable, makeBackup, pick
 import { bankLabel, cardLabel } from "../format";
 
 export function StorageChooser() {
-  const { setStore } = useApp();
+  const { setStore, store, snapshot } = useApp();
   const [err, setErr] = useState<string | null>(null);
   return (
     <div className="row wrap">
@@ -14,7 +14,7 @@ export function StorageChooser() {
           className="primary"
           onClick={async () => {
             try {
-              await setStore(await pickFolder());
+              await setStore(await pickFolder(store ? snapshot : null));
             } catch (e) {
               if ((e as DOMException).name !== "AbortError") setErr(String(e));
             }
@@ -72,7 +72,7 @@ export function Settings() {
           <p>Not set up yet.</p>
         )}
         <StorageChooser />
-        <p className="note">Switching to a new, empty folder copies what’s in this browser into it. Nothing is ever sent to a server.</p>
+        <p className="note">Choosing a new, empty folder copies the data you have open now into it; a folder that already holds data is opened as-is. Nothing is ever sent to a server.</p>
       </section>
 
       <section className="card">

@@ -43,6 +43,7 @@ function MappingForm({ header, onSave, onCancel }: { header: string[]; onSave: (
     debit: guess(/debit|withdraw/i) || undefined,
     credit: guess(/credit|deposit/i) || undefined,
     category: guess(/categ/i) || undefined,
+    accountType: "card",
     sign: "out-negative",
   });
   const mode = m.amount ? "amount" : "split";
@@ -68,6 +69,13 @@ function MappingForm({ header, onSave, onCancel }: { header: string[]; onSave: (
         <label className="field">
           <span>Account name</span>
           <input value={m.label} placeholder="e.g. Credit Union Visa" onChange={(e) => setM({ ...m, label: e.target.value, account: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") })} />
+        </label>
+        <label className="field">
+          <span>Kind of account</span>
+          <select value={m.accountType ?? "card"} onChange={(e) => setM({ ...m, accountType: e.target.value as "card" | "bank" })}>
+            <option value="card">Credit card</option>
+            <option value="bank">Bank account (checking/savings)</option>
+          </select>
         </label>
         {col("date", "Date")}
         {col("description", "Description")}

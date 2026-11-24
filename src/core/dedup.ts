@@ -14,28 +14,46 @@ function hash(str: string): string {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
-export const txnKey = (r: Pick<ParsedRow, "account" | "cardKey" | "date" | "amount" | "rawDescription">) =>
-  [r.account, r.cardKey, r.date, Math.round(r.amount * 100), r.rawDescription.trim().replace(/\s+/g, " ").toUpperCase()].join("|");
+type KeyFields = Pick<ParsedRow, "account" | "cardKey" | "date" | "amount" | "rawDescription">;
+
+const desc = (s: string) => s.trim().replace(/\s+/g, " ").toUpperCase();
+/** Key without the card: the same charge seen through files that label the card differently. */
+const looseKey = (r: KeyFields) => [r.account, r.date, Math.round(r.amount * 100), desc(r.rawDescription)].join("|");
+export const txnKey = (r: KeyFields) => [r.account, r.cardKey, r.date, Math.round(r.amount * 100), desc(r.rawDescription)].join("|");
 
 /**
- * Merge parsed rows into the ledger. Per key, the ledger ends with max(existing, incoming) rows,
- * so overlapping exports add nothing while genuinely new same-day repeats are kept.
+ * Merge parsed rows into the ledger without double counting.
+ * Each incoming row consumes one matching existing row if there is one: same card, or the same charge where
+ * either side's card was only assumed (typed, remembered, filename, "primary"). Unmatched rows are added.
+ * Per key this keeps max(existing, incoming), so overlapping exports add nothing and genuine same-day repeats stay.
  */
 export function mergeRows(existing: Txn[], incoming: ParsedRow[], importId: string): { txns: Txn[]; added: number; skipped: number } {
-  const have = new Map<string, number>();
+  const pool = new Map<string, { t: Txn; used: boolean }[]>();
+  const ids = new Set<string>();
   for (const t of existing) {
-    const k = txnKey(t);
-    have.set(k, (have.get(k) ?? 0) + 1);
+    ids.add(t.id);
+    const k = looseKey(t);
+    const list = pool.get(k);
+    if (list) list.push({ t, used: false });
+    else pool.set(k, [{ t, used: false }]);
   }
-  const seen = new Map<string, number>();
   const txns = existing.slice();
   let added = 0;
   for (const r of incoming) {
-    const k = txnKey(r);
-    const n = seen.get(k) ?? 0;
-    seen.set(k, n + 1);
-    if (n < (have.get(k) ?? 0)) continue;
-    txns.push({ ...r, id: `${hash(k)}#${n}`, importId });
+    const cands = pool.get(looseKey(r)) ?? [];
+    const match =
+      cands.find((c) => !c.used && c.t.cardKey === r.cardKey) ??
+      cands.find((c) => !c.used && (c.t.cardAssumed !== false || r.cardAssumed !== false));
+    if (match) {
+      match.used = true;
+      continue;
+    }
+    const h = hash(txnKey(r));
+    let n = 0;
+    while (ids.has(`${h}#${n}`)) n++;
+    const t: Txn = { ...r, id: `${h}#${n}`, importId };
+    ids.add(t.id);
+    txns.push(t);
     added++;
   }
   return { txns, added, skipped: incoming.length - added };

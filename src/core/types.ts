@@ -18,6 +18,8 @@ export type FormatId = "chase" | "amex" | "capitalone" | "discover" | "schwab" |
 export interface ParsedRow {
   account: AccountId;
   cardKey: string;
+  /** True when the card was not read from the file's own columns (typed, remembered, filename, or "primary"). */
+  cardAssumed?: boolean;
   date: string; // ISO yyyy-mm-dd
   postDate?: string;
   amount: number; // positive = money out
@@ -65,6 +67,8 @@ export interface ColumnMapping {
   debit?: string;
   credit?: string;
   category?: string;
+  /** Bank accounts treat outflows matching payoff patterns as transfers and inflows as deposits. */
+  accountType?: "card" | "bank";
   /** "out-positive": positive numbers are money out; "out-negative": negative numbers are money out. */
   sign: "out-positive" | "out-negative";
 }

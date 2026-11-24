@@ -4,6 +4,7 @@ import { mergeRows } from "./core/dedup";
 import type { ParseResult } from "./core/parsers";
 import { defaultRules } from "./core/rules";
 import type { ImportRecord, Rules } from "./core/types";
+import { serial } from "./storage/serial";
 import { emptyLedger, openStore, type Snapshot, type Store } from "./storage/store";
 
 export interface PendingImport {
@@ -49,6 +50,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<Snapshot>({ ledger: emptyLedger(), rules: defaultRules() });
   const [error, setError] = useState<string | null>(null);
   const storeRef = useRef<Store | null>(null);
+  const queue = useRef(serial());
 
   const guard = useCallback(async <T,>(p: () => Promise<T>): Promise<T | undefined> => {
     try {
@@ -99,9 +101,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (fn: (s: Snapshot) => Snapshot) => {
       const s = storeRef.current;
       if (!s) throw new Error("Choose where to keep your data first (Settings).");
-      const next = await s.update(fn);
-      setSnapshot(next);
-      return next;
+      // One write at a time, each applied to the freshest state, so quick edits never overwrite each other.
+      return queue.current(async () => {
+        const next = await s.update(fn);
+        setSnapshot(next);
+        return next;
+      });
     },
     [],
   );
@@ -109,7 +114,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const commitImports = useCallback(
     async (items: PendingImport[]) => {
       const records: ImportRecord[] = [];
-      await guard(async () => {
+      const ok = await guard(async () => {
         await update((snap) => {
           let txns = snap.ledger.txns;
           for (const it of items) {
@@ -131,9 +136,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
           return { ...snap, ledger: { ...snap.ledger, txns, imports: [...snap.ledger.imports, ...records] } };
         });
-        for (const it of items) await storeRef.current?.saveRaw(it.fileName, it.text);
+        for (const it of items) await storeRef.current?.saveRaw(it.fileName, it.text).catch((e) => console.warn("raw copy failed", e));
+        return true;
       });
-      return records;
+      // Only report what was actually written; on failure the Import page keeps the files queued.
+      return ok ? records : [];
     },
     [guard, update],
   );

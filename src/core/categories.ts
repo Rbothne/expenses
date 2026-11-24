@@ -119,8 +119,11 @@ export function mapIssuerCategory(account: string, issuerCategory: string | unde
   return null;
 }
 
-/** Resolution order: override → merchant rule → description rule → built-in merchant → fee/interest → issuer map → Other. */
-export function resolveCategory(t: Txn, rules: Rules, merchant = normalizeMerchant(t.rawDescription, rules)): string {
+/**
+ * Resolution order: override → merchant rule → description rule → fee/interest → built-in merchant →
+ * (refunds) the merchant's usual purchase category → issuer map → Other.
+ */
+export function resolveCategory(t: Txn, rules: Rules, merchant = normalizeMerchant(t.rawDescription, rules), refundHint?: string): string {
   const o = rules.overrides[t.id];
   if (o) return o;
   const m = rules.merchantCategories[merchant];
@@ -130,5 +133,6 @@ export function resolveCategory(t: Txn, rules: Rules, merchant = normalizeMercha
   if (t.kind === "fee" || t.kind === "interest") return "Fees & Interest";
   const b = MERCHANT_CATEGORY[merchant];
   if (b) return b;
+  if (t.kind === "refund" && refundHint) return refundHint;
   return mapIssuerCategory(t.account, t.issuerCategory, rules) ?? "Other";
 }

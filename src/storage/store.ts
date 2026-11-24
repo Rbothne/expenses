@@ -46,7 +46,7 @@ const HANDLE_KEY = "expenses.dirHandle";
 const MODE_KEY = "expenses.mode";
 
 /* ---------- Folder store ---------- */
-class FolderStore implements Store {
+export class FolderStore implements Store {
   kind = "folder" as const;
   private seen: Record<string, number> = {};
   constructor(private dir: FileSystemDirectoryHandle) {}
@@ -77,6 +77,18 @@ class FolderStore implements Store {
 
   async load() {
     return parseSnapshot(await this.readJson("ledger.json"), await this.readJson("rules.json"));
+  }
+
+  async hasFiles() {
+    for (const name of ["ledger.json", "rules.json"]) {
+      try {
+        await this.dir.getFileHandle(name);
+        return true;
+      } catch {
+        /* not there */
+      }
+    }
+    return false;
   }
 
   async changedOnDisk() {
@@ -151,15 +163,18 @@ export async function regrant(handle: FileSystemDirectoryHandle): Promise<Store 
   return s === "granted" ? new FolderStore(handle) : null;
 }
 
-/** Ask for a data folder. If the browser store has data and the folder is empty, carry it over. */
-export async function pickFolder(): Promise<Store> {
+/** Copy the data currently open into a newly chosen folder, but only if that folder has no data files yet. */
+export async function seedFolder(target: Pick<FolderStore, "hasFiles" | "update">, current: Snapshot | null): Promise<void> {
+  if (!current || (await target.hasFiles())) return;
+  if (!current.ledger.txns.length && !current.ledger.imports.length) return;
+  await target.update(() => current);
+}
+
+/** Ask for a data folder. An empty folder receives the data that is open right now (from whichever store). */
+export async function pickFolder(current: Snapshot | null): Promise<Store> {
   const handle = await window.showDirectoryPicker!({ id: "expenses-data", mode: "readwrite" });
   const store = new FolderStore(handle);
-  const existing = await store.load();
-  if (!existing.ledger.txns.length) {
-    const b = await new BrowserStore().load();
-    if (b.ledger.txns.length) await store.update(() => b);
-  }
+  await seedFolder(store, current);
   await set(HANDLE_KEY, handle);
   await set(MODE_KEY, "folder");
   return store;

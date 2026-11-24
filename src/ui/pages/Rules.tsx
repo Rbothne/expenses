@@ -14,7 +14,7 @@ function safeRe(p: string): RegExp | null {
   }
 }
 
-function PatternList({ title, help, items, onChange, field }: { title: string; help: string; items: string[]; onChange: (v: string[]) => void; field: "transfer" | "payment" }) {
+function PatternList({ title, help, items, onChange, field }: { title: string; help: string; items: string[]; onChange: (fn: (cur: string[]) => string[]) => void; field: "transfer" | "payment" }) {
   const { enriched } = useApp();
   const [draft, setDraft] = useState("");
   const count = (p: string) => {
@@ -32,7 +32,7 @@ function PatternList({ title, help, items, onChange, field }: { title: string; h
           <li key={i}>
             <code>{p}</code>
             <span className="muted">{count(p)}</span>
-            <button className="link danger" onClick={() => onChange(items.filter((_, j) => j !== i))}>
+            <button className="link danger" onClick={() => onChange((cur) => cur.filter((x) => x !== p))}>
               Remove
             </button>
           </li>
@@ -43,7 +43,10 @@ function PatternList({ title, help, items, onChange, field }: { title: string; h
         onSubmit={(e) => {
           e.preventDefault();
           if (draft.trim() && safeRe(draft)) {
-            onChange([...items, draft.trim()]);
+            {
+            const v = draft.trim();
+            onChange((cur) => (cur.includes(v) ? cur : [...cur, v]));
+          }
             setDraft("");
           }
         }}
@@ -61,7 +64,7 @@ function PatternList({ title, help, items, onChange, field }: { title: string; h
 export function Rules() {
   const { snapshot, updateRules, enriched } = useApp();
   const rules = snapshot.rules;
-  const set = (patch: Partial<R>) => updateRules((r) => ({ ...r, ...patch }));
+  const set = (patch: (r: R) => Partial<R>) => updateRules((r) => ({ ...r, ...patch(r) }));
   const [desc, setDesc] = useState({ pattern: "", category: "" });
   const [alias, setAlias] = useState({ pattern: "", merchant: "" });
   const [newCat, setNewCat] = useState("");
@@ -118,7 +121,7 @@ export function Rules() {
           onSubmit={(e) => {
             e.preventDefault();
             const c = newCat.trim();
-            if (c && !rules.categories.includes(c)) void set({ categories: [...rules.categories.filter((x) => x !== "Other"), c, "Other"] });
+            if (c && !rules.categories.includes(c)) void set((r) => ({ categories: r.categories.includes(c) ? r.categories : [...r.categories.filter((x) => x !== "Other"), c, "Other"] }));
             setNewCat("");
           }}
         >
@@ -169,7 +172,7 @@ export function Rules() {
               <code>{d.pattern}</code>
               <span>→ {d.category}</span>
               <span className="muted">{descCount(d.pattern)} matches</span>
-              <button className="link danger" onClick={() => set({ descriptionRules: rules.descriptionRules.filter((_, j) => j !== i) })}>
+              <button className="link danger" onClick={() => set((r) => ({ descriptionRules: r.descriptionRules.filter((x) => !(x.pattern === d.pattern && x.category === d.category)) }))}>
                 Remove
               </button>
             </li>
@@ -180,7 +183,10 @@ export function Rules() {
           onSubmit={(e) => {
             e.preventDefault();
             if (desc.pattern && desc.category && safeRe(desc.pattern)) {
-              void set({ descriptionRules: [...rules.descriptionRules, desc] });
+              {
+              const add = desc;
+              void set((r) => ({ descriptionRules: [...r.descriptionRules, add] }));
+            }
               setDesc({ pattern: "", category: "" });
             }
           }}
@@ -203,7 +209,7 @@ export function Rules() {
               <code>{a.pattern}</code>
               <span>→ {a.merchant}</span>
               <span className="muted">{descCount(a.pattern)} matches</span>
-              <button className="link danger" onClick={() => set({ aliases: rules.aliases.filter((_, j) => j !== i) })}>
+              <button className="link danger" onClick={() => set((r) => ({ aliases: r.aliases.filter((x) => !(x.pattern === a.pattern && x.merchant === a.merchant)) }))}>
                 Remove
               </button>
             </li>
@@ -232,7 +238,10 @@ export function Rules() {
           onSubmit={(e) => {
             e.preventDefault();
             if (alias.pattern && alias.merchant && safeRe(alias.pattern)) {
-              void set({ aliases: [...rules.aliases, alias] });
+              {
+              const add = alias;
+              void set((r) => ({ aliases: [...r.aliases, add] }));
+            }
               setAlias({ pattern: "", merchant: "" });
             }
           }}
@@ -297,14 +306,14 @@ export function Rules() {
         help="Money leaving Schwab that matches one of these is a card payment and is left out of spending (the purchases already count on the card)."
         items={rules.transferPatterns}
         field="transfer"
-        onChange={(v) => set({ transferPatterns: v })}
+        onChange={(fn) => set((r) => ({ transferPatterns: fn(r.transferPatterns) }))}
       />
       <PatternList
         title="Payments on cards"
         help="Credits on a card that match one of these are your payments, not refunds."
         items={rules.paymentPatterns}
         field="payment"
-        onChange={(v) => set({ paymentPatterns: v })}
+        onChange={(fn) => set((r) => ({ paymentPatterns: fn(r.paymentPatterns) }))}
       />
 
       <section className="card">
@@ -317,7 +326,7 @@ export function Rules() {
               <li key={m.signature}>
                 <strong>{m.label}</strong>
                 <code>{m.signature}</code>
-                <button className="link danger" onClick={() => set({ columnMappings: rules.columnMappings.filter((x) => x.signature !== m.signature) })}>
+                <button className="link danger" onClick={() => set((r) => ({ columnMappings: r.columnMappings.filter((x) => x.signature !== m.signature) }))}>
                   Remove
                 </button>
               </li>

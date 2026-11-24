@@ -21,7 +21,8 @@ const FEE_CAT = /^fees?\b|fee\/interest|^fees & adjustments/i;
 const INTEREST_CAT = /^interest\b|interest charge/i;
 const REWARD = /CASH ?BACK|\bREWARDS?\b|REDEMPTION|\bAWARD/i;
 const REWARD_CAT = /award|rebate|reward/i;
-const TRANSFER_DESC = /FUNDS TRANSFER|\bTRANSFER (TO|FROM)\b|\bXFER\b/i;
+const PAYMENT_REVERSAL = /PAYMENT REVERSAL|RETURNED PAYMENT|PAYMENT RETURNED|REVERSE PAYMENT/i;
+const TRANSFER_DESC =/FUNDS TRANSFER|\bTRANSFER (TO|FROM)\b|\bXFER\b/i;
 
 const anyMatch = (patterns: string[], s: string) =>
   patterns.some((p) => {
@@ -50,6 +51,8 @@ export function classifyKind(r: RawRow, accountType: AccountType, rules: Pick<Ru
   if (r.amount > 0) {
     if (INTEREST.test(d) || INTEREST_CAT.test(cat)) return "interest";
     if (t === "fee" || FEE_DESC.test(d) || FEE_CAT.test(cat)) return "fee";
+    // A reversed or returned payment puts the payment back on the card; it isn't spending.
+    if (t === "payment" || PAYMENT_REVERSAL.test(d)) return "payment";
     return "purchase";
   }
   if (t === "return") return "refund";

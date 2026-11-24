@@ -7,7 +7,7 @@ export function cardFromFilename(name: string): string | null {
   const base = name.replace(/^.*[\\/]/, "");
   let m = /^chase(\d{4})_/i.exec(base);
   if (m) return m[1];
-  m = /(?:card|acct|account|ending|x)[-_ ]?(\d{4})(?!\d)/i.exec(base);
+  m = /(?:\b(?:card|acct|account|ending)[-_ ]?|\bx)(\d{4})(?!\d)/i.exec(base);
   if (m) return m[1];
   return null;
 }
