@@ -96,6 +96,7 @@ export function normalizeMerchant(raw: string, rules: Rules): string {
     out = BUILTIN.find(([re]) => re.test(up))?.[1] ?? cleanup(raw);
   }
   if (!out) out = titleCase(raw.replace(/\s+/g, " ").trim()) || "Unknown";
+  out = rules.renames?.[out] ?? out;
   m.set(raw, out);
   return out;
 }

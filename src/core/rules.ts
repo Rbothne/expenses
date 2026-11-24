@@ -28,6 +28,7 @@ export function defaultRules(): Rules {
     version: 1,
     categories: [...CATEGORIES],
     aliases: [],
+    renames: {},
     merchantCategories: {},
     descriptionRules: [],
     overrides: {},

@@ -24,6 +24,8 @@ export interface ParsedRow {
   rawDescription: string;
   kind: Kind;
   issuerCategory?: string;
+  /** Bank's own type column, lower-cased; kept so kinds can be re-derived when rules change. */
+  typeHint?: string;
   cardMember?: string;
 }
 
@@ -81,6 +83,8 @@ export interface Rules {
   version: 1;
   categories: string[];
   aliases: AliasRule[];
+  /** normalized merchant -> display merchant; renaming two merchants to one name merges them */
+  renames: Record<string, string>;
   /** merchant (normalized) -> category */
   merchantCategories: Record<string, string>;
   descriptionRules: CategoryRule[];

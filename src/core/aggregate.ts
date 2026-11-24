@@ -1,4 +1,6 @@
 import { resolveCategory } from "./categories";
+import { classifyKind } from "./classify";
+import { accountTypeOf } from "./parsers";
 import { normalizeMerchant } from "./merchant";
 import { cents } from "./money";
 import { SPEND_KINDS, type Rules, type Txn } from "./types";
@@ -22,7 +24,9 @@ export interface Filters {
 }
 
 export function enrich(txns: Txn[], rules: Rules): EnrichedTxn[] {
-  return txns.map((t) => {
+  return txns.map((stored) => {
+    // Kinds are re-derived so edits to payoff/payment patterns apply to past imports too.
+    const t = { ...stored, kind: classifyKind(stored, accountTypeOf(stored.account), rules) };
     const merchant = normalizeMerchant(t.rawDescription, rules);
     return { ...t, merchant, category: resolveCategory(t, rules, merchant), isSpend: SPEND_KINDS.has(t.kind) };
   });

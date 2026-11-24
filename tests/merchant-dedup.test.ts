@@ -36,6 +36,11 @@ describe("normalizeMerchant", () => {
     expect(normalizeMerchant("COSTCO GAS #0482", r)).toBe("Costco Gas");
     expect(normalizeMerchant("COSTCO WHSE #0482", r)).toBe("Costco");
   });
+  it("renames apply after normalization (rename + merge)", () => {
+    const r: Rules = { ...rules, renames: { Safeway: "Grocery Store", "Whole Foods": "Grocery Store" } };
+    expect(normalizeMerchant("SAFEWAY #1234 SEATTLE WA", r)).toBe("Grocery Store");
+    expect(normalizeMerchant("WHOLEFDS MKT #10234", r)).toBe("Grocery Store");
+  });
   it("survives a broken user regex", () => {
     const r: Rules = { ...rules, aliases: [{ pattern: "([", merchant: "X" }] };
     expect(normalizeMerchant("NETFLIX.COM", r)).toBe("Netflix");

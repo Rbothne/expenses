@@ -25,7 +25,7 @@ const txns: Txn[] = [
   t("2026-04-10", 900, "BIG TV STORE", { issuerCategory: "Shopping" }),
   t("2026-04-12", -950, "BIG TV STORE", { issuerCategory: "Shopping" }),
   t("2026-02-10", 50, "WHOLEFDS MKT", { account: "amex", cardKey: "61005:JANE", issuerCategory: undefined }),
-  t("2026-02-11", 500, "AUTOPAY PAYMENT", { kind: "payment" }),
+  t("2026-02-11", -500, "AUTOPAY PAYMENT", { kind: "payment" }),
   t("2026-03-01", 1200, "COSTCO WHSE #1", { account: "amex", cardKey: "62003:JOHN", issuerCategory: "Merchandise & Supplies-Wholesale Stores" }),
 ];
 const e = enrich(txns, rules);
@@ -55,6 +55,21 @@ describe("enrich + filters", () => {
     expect(applyFilters(e, { accounts: ["amex"], categories: [] }, "bank")).toHaveLength(2);
     expect(applyFilters(e, { accounts: ["amex:62003:JOHN"], categories: [] }, "card")).toHaveLength(1);
     expect(applyFilters(e, { accounts: [], categories: ["Shopping"] }, "bank")).toHaveLength(2);
+  });
+});
+
+describe("retroactive reclassification", () => {
+  it("transfer pattern edits re-classify stored Schwab rows", () => {
+    const venmo = t("2026-05-01", 40, "VENMO PAYMENT 1023", { account: "schwab", cardKey: "primary", kind: "purchase", issuerCategory: undefined });
+    expect(enrich([venmo], rules)[0].kind).toBe("purchase");
+    const r2 = { ...rules, transferPatterns: [...rules.transferPatterns, "VENMO"] };
+    const e2 = enrich([venmo], r2)[0];
+    expect(e2.kind).toBe("transfer");
+    expect(e2.isSpend).toBe(false);
+  });
+  it("card type hints survive reclassification", () => {
+    const ret = t("2026-05-01", -20, "AMAZON PAYMENTS RETURN", { typeHint: "return" });
+    expect(enrich([ret], rules)[0].kind).toBe("refund");
   });
 });
 

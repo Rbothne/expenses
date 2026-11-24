@@ -12,6 +12,8 @@ export const BUILTIN_FORMATS: { id: Exclude<FormatId, `generic:${string}`>; labe
   { id: "schwab", label: "Schwab bank", account: "schwab", type: "bank" },
 ];
 
+export const accountTypeOf = (account: AccountId): AccountType => BUILTIN_FORMATS.find((f) => f.account === account)?.type ?? "card";
+
 export const headerSignature = (header: string[]) => header.map(normHeader).join("|");
 
 export function detectFormat(header: string[]): Exclude<FormatId, `generic:${string}`> | null {
@@ -194,6 +196,7 @@ export function parseFile(fileName: string, text: string, rules: Rules, opts: Pa
       rawDescription: raw.rawDescription,
       kind: classifyKind(raw, accountType, rules),
       issuerCategory: raw.issuerCategory,
+      typeHint: raw.typeHint,
       cardMember: raw.cardMember,
     });
   }
