@@ -34,7 +34,7 @@ const BUILTIN: [RegExp, string][] = [
   [/\bVENMO\b/, "Venmo"],
 ];
 
-const PREFIX = /^(SQ ?\*|TST ?\*|SP ?\*|PAYPAL ?\*|PP ?\*|DD ?\*|IC ?\*|CKO ?\*|GOOGLE ?\*|BT ?\*|PY ?\*|SPO ?\*|EB ?\*|FSP ?\*|POS |DEBIT CARD PURCHASE |PURCHASE AUTHORIZED ON \S+ |CHECKCARD \S+ )\s*/;
+const PREFIX = /^(SQ ?\*|TST ?\*|SP ?\*|PAYPAL ?\*|PP ?\*|DD ?\*|IC ?\*|CKO ?\*|GOOGLE ?\*|BT ?\*|PY ?\*|SPO ?\*|EB ?\*|FSP ?\*|POS |DEBIT CARD PURCHASE |PURCHASE AUTHORIZED ON \S+ |CHECKCARD \S+ |ZELLE (PAYMENT )?TO |VENMO (PAYMENT )?TO )\s*/;
 const STATES = new Set(
   "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" "),
 );

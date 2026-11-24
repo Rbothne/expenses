@@ -2,6 +2,7 @@ import { normalizeMerchant } from "./merchant";
 import type { Rules, Txn } from "./types";
 
 export const CATEGORIES = [
+  "Housing",
   "Groceries",
   "Dining",
   "Gas & Auto",
@@ -101,6 +102,9 @@ const MERCHANT_CATEGORY: Record<string, string> = {
   Lyft: "Travel",
 };
 
+/** Rent and mortgage, usually paid from checking with nothing but a payee name. Not "RENT-A-CAR". */
+const HOUSING = /\bRENT\b(?!-A-)|\bAPARTMENTS?\b|\bAPTS\b|PROPERTY (MGMT|MANAGEMENT)|\bMORTGAGE\b|\bMTG PMT\b|\bHOA\b|\bLANDLORD\b/i;
+
 const safeTest = (pattern: string, s: string) => {
   try {
     return new RegExp(pattern, "i").test(s);
@@ -120,7 +124,7 @@ export function mapIssuerCategory(account: string, issuerCategory: string | unde
 }
 
 /**
- * Resolution order: override → merchant rule → description rule → fee/interest → built-in merchant →
+ * Resolution order: override → merchant rule → description rule → fee/interest → built-in merchant → rent/mortgage →
  * (refunds) the merchant's usual purchase category → issuer map → Other.
  */
 export function resolveCategory(t: Txn, rules: Rules, merchant = normalizeMerchant(t.rawDescription, rules), refundHint?: string): string {
@@ -133,6 +137,7 @@ export function resolveCategory(t: Txn, rules: Rules, merchant = normalizeMercha
   if (t.kind === "fee" || t.kind === "interest") return "Fees & Interest";
   const b = MERCHANT_CATEGORY[merchant];
   if (b) return b;
+  if (HOUSING.test(t.rawDescription)) return "Housing";
   if (t.kind === "refund" && refundHint) return refundHint;
   return mapIssuerCategory(t.account, t.issuerCategory, rules) ?? "Other";
 }

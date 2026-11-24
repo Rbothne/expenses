@@ -3,6 +3,7 @@ import { regrant } from "./storage/store";
 import { fmtDate } from "./ui/format";
 import { CategoryDetail } from "./ui/pages/CategoryDetail";
 import { Import } from "./ui/pages/Import";
+import { Insights } from "./ui/pages/Insights";
 import { MerchantDetail } from "./ui/pages/MerchantDetail";
 import { Overview } from "./ui/pages/Overview";
 import { Rules } from "./ui/pages/Rules";
@@ -12,6 +13,7 @@ import { href, useRoute } from "./ui/router";
 
 const NAV = [
   { path: "/", label: "Overview" },
+  { path: "/insights", label: "Insights" },
   { path: "/transactions", label: "Transactions" },
   { path: "/import", label: "Import" },
   { path: "/rules", label: "Rules" },
@@ -62,6 +64,7 @@ export function App() {
     );
   else if (route.segments[0] === "category") body = <CategoryDetail route={route} />;
   else if (route.segments[0] === "merchant") body = <MerchantDetail route={route} />;
+  else if (top === "/insights") body = <Insights route={route} />;
   else if (top === "/transactions") body = <Transactions route={route} />;
   else if (top === "/import") body = <Import />;
   else if (top === "/rules") body = <Rules />;
@@ -76,7 +79,7 @@ export function App() {
         </a>
         <nav>
           {NAV.map((n) => (
-            <a key={n.path} href={href(n.path, n.path === "/" || n.path === "/transactions" ? keep : undefined)} aria-current={(n.path === "/" ? top === "/" || route.segments[0] === "category" || route.segments[0] === "merchant" : top === n.path) ? "page" : undefined}>
+            <a key={n.path} href={href(n.path, n.path === "/" || n.path === "/transactions" || n.path === "/insights" ? keep : undefined)} aria-current={(n.path === "/" ? top === "/" || route.segments[0] === "category" || route.segments[0] === "merchant" : top === n.path) ? "page" : undefined}>
               {n.label}
             </a>
           ))}

@@ -26,6 +26,12 @@ export const DEFAULT_PAYMENT_PATTERNS = [
   "\\bPYMT\\b",
 ];
 
+/** How paychecks show up in checking. Deliberately not bare "DEPOSIT" or "ACH", which also hit transfers and refunds. */
+export const DEFAULT_INCOME_PATTERNS = ["PAYROLL", "\\bPAYRL\\b", "\\bDIR(ECT)? ?DEP", "DIRECT DEPOSIT", "\\bSALARY\\b", "\\bPAYCHECK\\b"];
+
+/** 50/30/20 "needs": housing, food at home, utilities, insurance, health care, getting to work. */
+export const DEFAULT_NEEDS = ["Housing", "Groceries", "Utilities & Bills", "Insurance", "Health", "Gas & Auto"];
+
 /** Rename a merchant; works for merged groups (renames apply one hop, so every source is re-pointed). */
 export function applyRename(r: Rules, name: string, to: string): Rules {
   to = to.trim();
@@ -58,11 +64,18 @@ export function defaultRules(): Rules {
     cardNames: {},
     defaultCards: {},
     breakdownBy: "bank",
+    incomePatterns: [...DEFAULT_INCOME_PATTERNS],
+    needsCategories: [...DEFAULT_NEEDS],
+    profile: {},
   };
 }
 
 /** Fill any fields missing from an older or hand-edited rules file. */
 export function withDefaults(r: Partial<Rules> | undefined): Rules {
   const d = defaultRules();
-  return { ...d, ...(r ?? {}), version: 1 };
+  const out: Rules = { ...d, ...(r ?? {}), version: 1 };
+  // Files from before Housing existed (they also lack incomePatterns) gain it once; a later removal sticks.
+  if (r && !r.incomePatterns && r.categories && !r.categories.includes("Housing")) out.categories = ["Housing", ...r.categories];
+  out.profile = { ...(r?.profile ?? {}) };
+  return out;
 }

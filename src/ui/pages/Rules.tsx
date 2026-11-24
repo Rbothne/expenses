@@ -14,13 +14,13 @@ function safeRe(p: string): RegExp | null {
   }
 }
 
-function PatternList({ title, help, items, onChange, field }: { title: string; help: string; items: string[]; onChange: (fn: (cur: string[]) => string[]) => void; field: "transfer" | "payment" }) {
+function PatternList({ title, help, items, onChange, field }: { title: string; help: string; items: string[]; onChange: (fn: (cur: string[]) => string[]) => void; field: "transfer" | "payment" | "income" }) {
   const { enriched } = useApp();
   const [draft, setDraft] = useState("");
   const count = (p: string) => {
     const re = safeRe(p);
     if (!re) return "invalid";
-    const n = enriched.filter((t) => (field === "transfer" ? t.amount > 0 && t.account === "schwab" : t.amount < 0) && re.test(t.rawDescription)).length;
+    const n = enriched.filter((t) => (field === "transfer" ? t.amount > 0 && t.account === "schwab" : field === "income" ? t.kind === "deposit" : t.amount < 0) && re.test(t.rawDescription)).length;
     return `${n} match${n === 1 ? "" : "es"}`;
   };
   return (
@@ -314,6 +314,13 @@ export function Rules() {
         items={rules.paymentPatterns}
         field="payment"
         onChange={(fn) => set((r) => ({ paymentPatterns: fn(r.paymentPatterns) }))}
+      />
+      <PatternList
+        title="Paychecks"
+        help="Deposits into Schwab (or another bank account) that match one of these count as take-home pay on the Insights page. Transfers in from your own accounts shouldn't match."
+        items={rules.incomePatterns}
+        field="income"
+        onChange={(fn) => set((r) => ({ incomePatterns: fn(r.incomePatterns) }))}
       />
 
       <section className="card">

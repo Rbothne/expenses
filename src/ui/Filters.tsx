@@ -15,10 +15,10 @@ export interface ViewFilters extends F {
 
 const list = (s: string | null) => (s ? s.split(",").filter(Boolean) : []);
 
-export function useFilters(route: Route): ViewFilters {
+export function useFilters(route: Route, defaultPreset: RangePreset = "24m"): ViewFilters {
   const { earliest, latest } = useApp();
   const p = route.params;
-  const preset = (p.get("range") as RangePreset) || "24m";
+  const preset = (p.get("range") as RangePreset) || defaultPreset;
   const { from, to } = rangeFor(preset, latest, earliest, { from: p.get("from") ?? undefined, to: p.get("to") ?? undefined });
   return {
     preset,
@@ -63,7 +63,7 @@ function MultiSelect({ label, options, value, onChange }: { label: string; optio
   );
 }
 
-export function FilterBar({ route, f, showCategories = true, showBucket = false }: { route: Route; f: ViewFilters; showCategories?: boolean; showBucket?: boolean }) {
+export function FilterBar({ route, f, showCategories = true, showBucket = false, children }: { route: Route; f: ViewFilters; showCategories?: boolean; showBucket?: boolean; children?: React.ReactNode }) {
   const { enriched, groupBy, snapshot } = useApp();
   const accounts = useMemo(() => {
     const s = new Set<string>();
@@ -114,6 +114,7 @@ export function FilterBar({ route, f, showCategories = true, showBucket = false 
           </label>
         </>
       )}
+      {children}
     </div>
   );
 }

@@ -95,3 +95,12 @@ describe("mergeRows", () => {
     expect(a.txns[0].importId).toBe("imp1");
   });
 });
+
+import { normalizeMerchant as nm } from "../src/core/merchant";
+import { defaultRules as dr } from "../src/core/rules";
+describe("payee prefixes", () => {
+  it("strips Zelle/Venmo 'to' so the payee is the merchant", () => {
+    expect(nm("ZELLE TO OAK APARTMENTS", dr())).toBe("Oak Apartments");
+    expect(nm("ZELLE PAYMENT TO JANE DOE", dr())).toBe("Jane Doe");
+  });
+});

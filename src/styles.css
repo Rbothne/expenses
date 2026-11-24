@@ -612,3 +612,164 @@ input:not([type="checkbox"]) {
     max-width: 130px;
   }
 }
+
+/* Insights */
+.lead {
+  font-size: 17px;
+  margin: 4px 0 12px;
+}
+.chg {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.insights {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+.callout {
+  background: var(--warn-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0 12px;
+}
+/* Diverging change bar: blue = less spending, red = more; neutral gray midline. */
+.dbar {
+  position: relative;
+  height: 10px;
+}
+.dbar::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--axis);
+}
+.dbar span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 2px;
+}
+.dbar .neg {
+  background: var(--series-1);
+  border-radius: 4px 0 0 4px;
+}
+.dbar .pos {
+  background: var(--series-8);
+  border-radius: 0 4px 4px 0;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.meter {
+  position: relative;
+  height: 8px;
+  background: var(--grid);
+  border-radius: 4px;
+  overflow: visible;
+  margin: 6px 0 2px;
+}
+.meter > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: var(--series-1);
+}
+.meter > i {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--text-2);
+}
+.checks {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.check {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.check h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.check .verdict {
+  font-weight: 600;
+}
+.check .src {
+  font-size: 12px;
+  color: var(--muted);
+}
+.pair {
+  display: grid;
+  gap: 2px;
+}
+.pair span {
+  display: block;
+  height: 6px;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+}
+.pair .you,
+.sw.you {
+  background: var(--series-1);
+}
+.pair .them,
+.sw.them {
+  background: var(--series-other);
+}
+.legend-inline {
+  font-weight: normal;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.sw {
+  display: inline-block;
+  width: 10px;
+  height: 4px;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin: 0 2px 0 6px;
+}
+.ctx {
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+.profile {
+  margin-bottom: 10px;
+}
+.profile summary {
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.field {
+  min-width: 0;
+  max-width: 100%;
+}
+.field select {
+  max-width: 100%;
+}
+@media (max-width: 640px) {
+  .ms:last-of-type .ms-pop {
+    left: auto;
+    right: 0;
+  }
+  .ms-pop {
+    max-width: calc(100vw - 32px);
+  }
+}

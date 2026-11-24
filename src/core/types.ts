@@ -106,4 +106,25 @@ export interface Rules {
   /** account -> remembered default cardKey for files without card info */
   defaultCards: Record<string, string>;
   breakdownBy: "bank" | "card";
+  /** Regex sources; a bank-account deposit matching one is income (a paycheck), not a transfer or refund. */
+  incomePatterns: string[];
+  /** Categories counted as needs in the 50/30/20 check; everything else spent is a want. */
+  needsCategories: string[];
+  profile: Profile;
+}
+
+/** What the health checks and benchmarks need to know that the CSVs can't say. All optional. */
+export interface Profile {
+  /** People the tracked spending covers. */
+  householdSize?: number;
+  /** benchmarks.json group id ("all", "region:west", "size:2", ...) */
+  benchmarkGroup?: string;
+  /** Before-tax yearly income, for the housing and retirement checks. */
+  grossAnnual?: number;
+  /** Typed take-home per month; overrides paychecks detected from deposits. */
+  takeHomeMonthly?: number;
+  /** Picks the right survey group for Housing. Unset = rent. */
+  tenure?: "rent" | "own-mortgage" | "own-outright";
+  /** Cash set aside for emergencies, for the months-covered check. */
+  emergencySavings?: number;
 }
