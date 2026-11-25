@@ -20,3 +20,7 @@ expenses-backup*.json
 # Synthetic test fixtures are the one allowed exception.
 !tests/fixtures/*.csv
 !tests/fixtures/*.CSV
+# Bundled public benchmark figures (BLS/CPI/OECD), not personal data. Only this one file.
+!src/data/
+src/data/*
+!src/data/benchmarks.json
